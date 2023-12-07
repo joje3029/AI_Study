@@ -1,222 +1,140 @@
-# Project 4 - Advanced Lane Finding
 
-<p align="center">
- <a href="https://www.youtube.com/watch?v=g5BhDtoheE4"><img src="./img/overview.gif" alt="Overview" width="50%" height="50%"></a>
- <br>Qualitative results. (click for full video)
-</p>
+<div align="center">
+  <img width="450" src="assets/Flask_logo.svg">
+</div>
 
----
+# Yolov8 Flask API for detection and segmentation : YOLOv8 Flask API를 이용한 검출 및 분할
 
-**Advanced Lane Finding Project**
+<div align="center">
+  <a href="https://www.buymeacoffee.com/hdnh2006" target="_blank">
+    <img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy Me A Coffee">
+  </a>
+</div>
 
-The goals / steps of this project are the following:
+![Screen GIF](assets/screen.gif)
 
-* Compute the camera calibration matrix and distortion coefficients given a set of chessboard images.
-* Apply a distortion correction to raw images.
-* Use color transforms, gradients, etc., to create a thresholded binary image.
-* Apply a perspective transform to rectify binary image ("birds-eye view").
-* Detect lane pixels and fit to find the lane boundary.
-* Determine the curvature of the lane and vehicle position with respect to center.
-* Warp the detected lane boundaries back onto the original image.
-* Output visual display of the lane boundaries and numerical estimation of lane curvature and vehicle position.
+This code is based on the YOLOv8 code from Ultralytics and it has all the functionalities that the original code has:
+- Different source: images, videos, webcam, RTSP cameras.
+- All the weights are supported: TensorRT, Onnx, DNN, openvino.
 
-[//]: # (Image References)
+The API can be called in an interactive way, and also as a single API called from terminal and it supports all the tasks provided by YOLOv8 (detection, segmentation, classification and pose estimation) in the same API!!!!
 
-[img_overview]: ./img/overview.gif "Output Overview"
+All [models](https://github.com/ultralytics/ultralytics/tree/main/ultralytics/cfg/models) download automatically from the latest Ultralytics [release](https://github.com/ultralytics/assets/releases) on first use.
 
+<img width="1024" src="https://raw.githubusercontent.com/ultralytics/assets/main/im/banner-tasks.png">
 
-## [Rubric](https://review.udacity.com/#!/rubrics/571/view)
+## Requirements
 
-### Camera Calibration
+Python 3.8 or later with all [requirements.txt](requirements.txt) dependencies installed, including `torch>=1.7`. To install run:
 
-OpenCV provide some really helpful built-in functions for the task on camera calibration. First of all, to detect the calibration pattern in the [calibration images](./camera_cal/), we can use the function `cv2.findChessboardCorners(image, pattern_size)`. 
-
-Once we have stored the correspondeces between 3D world and 2D image points for a bunch of images, we can proceed to actually calibrate the camera through `cv2.calibrateCamera()`. Among other things, this function returns both the *camera matrix* and the *distortion coefficients*, which we can use to undistort the frames.
-
-The code for this steps can be found in [calibration_utils](calibration_utils.py).   
-
-I applied this distortion correction to the test image using the `cv2.undistort()` function and obtained the following result (appreciating the effect of calibration is easier on the borders of the image): 
-
-<table style="width:100%">
-  <tr>
-    <th>
-      <p align="center">
-           <img src="./img/calibration_before.jpg" alt="calibration_before" width="60%" height="60%">
-           <br>Chessboard image before calibration
-      </p>
-    </th>
-    <th>
-      <p align="center">
-           <img src="./img/calibration_after.jpg" alt="calibration_after" width="60%" height="60%">
-           <br>Chessboard image after calibration
-      </p>
-    </th>
-  </tr>
-</table>
-
-### Pipeline (single images)
-
-#### 1. Provide an example of a distortion-corrected image.
-
-Once the camera is calibrated, we can use the camera matrix and distortion coefficients we found to undistort also the test images. Indeed, if we want to study the *geometry* of the road, we have to be sure that the images we're processing do not present distortions. Here's the result of distortion-correction on one of the test images:
-
-<table style="width:100%">
-  <tr>
-    <th>
-      <p align="center">
-           <img src="./img/test_calibration_before.jpg" alt="calibration_before" width="60%" height="60%">
-           <br>Test image before calibration
-      </p>
-    </th>
-    <th>
-      <p align="center">
-           <img src="./img/test_calibration_after.jpg" alt="calibration_after" width="60%" height="60%">
-           <br>Test image after calibration
-      </p>
-    </th>
-  </tr>
-</table>
-
-In this case appreciating the result is slightly harder, but we can notice nonetheless some difference on both the very left and very right side of the image.
-
-#### 2. Describe how (and identify where in your code) you used color transforms, gradients or other methods to create a thresholded binary image.  Provide an example of a binary image result.
-
-Correctly creating the binary image from the input frame is the very first step of the whole pipeline that will lead us to detect the lane. For this reason, I found that is also one of the most important. If the binary image is bad, it's very difficult to recover and to obtain good results in the successive steps of the pipeline. The code related to this part can be found [here](./binarization_utils.py).
-
-I used a combination of color and gradient thresholds to generate a binary image. In order to detect the white lines, I found that [equalizing the histogram](http://docs.opencv.org/3.1.0/d5/daf/tutorial_py_histogram_equalization.html) of the input frame before thresholding works really well to highlight the actual lane lines. For the yellow lines, I employed a threshold on V channel in [HSV](http://docs.opencv.org/3.2.0/df/d9d/tutorial_py_colorspaces.html) color space. Furthermore, I also convolve the input frame with Sobel kernel to get an estimate of the gradients of the lines. Finally, I make use of [morphological closure](http://docs.opencv.org/3.0-beta/doc/py_tutorials/py_imgproc/py_morphological_ops/py_morphological_ops.html) to *fill the gaps* in my binary image. Here I show every substep and the final output:
-<p align="center">
-  <img src="./img/binarization.png" alt="binarization overview" width="90%" height="90%">
-</p>
-
-#### 3. Describe how (and identify where in your code) you performed a perspective transform and provide an example of a transformed image.
-
-Code relating to warping between the two perspective can be found [here](./perspective_utils.py). The function `calibration_utils.birdeye()` takes as input the frame (either color or binary) and returns the bird's-eye view of the scene. In order to perform the perspective warping, we need to map 4 points in the original space and 4 points in the warped space. For this purpose, both source and destination points are *hardcoded* (ok, I said it) as follows:
-
-```
-    h, w = img.shape[:2]
-
-    src = np.float32([[w, h-10],    # br
-                      [0, h-10],    # bl
-                      [546, 460],   # tl
-                      [732, 460]])  # tr
-    dst = np.float32([[w, h],       # br
-                      [0, h],       # bl
-                      [0, 0],       # tl
-                      [w, 0]])      # tr
-
+```bash
+$ pip3 install -r requirements.txt
 ```
 
-I verified that my perspective transform was working as expected by drawing the `src` and `dst` points onto a test image and its warped counterpart to verify that the lines appear parallel in the warped image.
+## [Detection](https://docs.ultralytics.com/tasks/detect), [Segmentation](https://docs.ultralytics.com/tasks/segment), [Classification](https://docs.ultralytics.com/tasks/classify) and [Pose Estimation](https://docs.ultralytics.com/tasks/pose) models pretrained on the [COCO](https://docs.ultralytics.com/datasets/detect/coco) in the same API
 
-<p align="center">
-  <img src="./img/perspective_output.png" alt="birdeye_view" width="90%" height="90%">
-</p>
+`predict_api.py` can deal with several sources and can run into the cpu, but it is highly recommendable to run in gpu.
 
-#### 4. Describe how (and identify where in your code) you identified lane-line pixels and fit their positions with a polynomial?
+```bash
+Usage - formats:
+    $ python predict_api.py --weights yolov8s.pt                # PyTorch
+                                     yolov8s.torchscript        # TorchScript
+                                     yolov8s.onnx               # ONNX Runtime or OpenCV DNN with --dnn
+                                     yolov8s_openvino_model     # OpenVINO
+                                     yolov8s.engine             # TensorRT
+                                     yolov8s.mlmodel            # CoreML (macOS-only)
+                                     yolov8s_saved_model        # TensorFlow SavedModel
+                                     yolov8s.pb                 # TensorFlow GraphDef
+                                     yolov8s.tflite             # TensorFlow Lite
+                                     yolov8s_edgetpu.tflite     # TensorFlow Edge TPU
+                                     yolov8s_paddle_model       # PaddlePaddle
 
-In order to identify which pixels of a given binary image belong to lane-lines, we have (at least) two possibilities. If we have a brand new frame, and we never identified where the lane-lines are, we must perform an exhaustive search on the frame. This search is implemented in `line_utils.get_fits_by_sliding_windows()`: starting from the bottom of the image, precisely from the peaks location of the histogram of the binary image, we slide two windows towards the upper side of the image, deciding which pixels belong to which lane-line.
-
-On the other hand, if we're processing a video and we confidently identified lane-lines on the previous frame, we can limit our search in the neiborhood of the lane-lines we detected before: after all we're going at 30fps, so the lines won't be so far, right? This second approach is implemented in `line_utils.get_fits_by_previous_fits()`. In order to keep track of detected lines across successive frames, I employ a class defined in `line_utils.Line`, which helps in keeping the code cleaner.
-
-```
-class Line:
-
-    def __init__(self, buffer_len=10):
-
-        # flag to mark if the line was detected the last iteration
-        self.detected = False
-
-        # polynomial coefficients fitted on the last iteration
-        self.last_fit_pixel = None
-        self.last_fit_meter = None
-
-        # list of polynomial coefficients of the last N iterations
-        self.recent_fits_pixel = collections.deque(maxlen=buffer_len)
-        self.recent_fits_meter = collections.deque(maxlen=2 * buffer_len)
-
-        self.radius_of_curvature = None
-
-        # store all pixels coords (x, y) of line detected
-        self.all_x = None
-        self.all_y = None
-    
-    ... methods ...
+Usage - tasks:
+    $ python predict_api.py --weights yolov8s.pt                # Detection
+                                     yolov8s-seg.pt             # Segmentation
+                                     yolov8s-cls.pt             # Classification
+                                     yolov8s-pose.pt            # Pose Estimation
 ```
 
-The actual processing pipeline is implemented in function `process_pipeline()` in [`main.py`](./main.py). As it can be seen, when a detection of lane-lines is available for a previous frame, new lane-lines are searched through `line_utils.get_fits_by_previous_fits()`: otherwise, the more expensive sliding windows search is performed.
+## Interactive implementation implemntation
 
-The qualitative result of this phase is shown here:
+You can deploy the API able to label an interactive way.
 
-<table style="width:100%">
-  <tr>
-    <th>
-      <p align="center">
-           <img src="./img/sliding_windows_before.png" alt="sliding_windows_before" width="60%" height="60%">
-           <br>Bird's-eye view (binary)
-      </p>
-    </th>
-    <th>
-      <p align="center">
-           <img src="./img/sliding_windows_after.png" alt="sliding_windows_after" width="60%" height="60%">
-           <br>Bird's-eye view (lane detected)
-      </p>
-    </th>
-  </tr>
-</table>
+Run:
 
-#### 5. Describe how (and identify where in your code) you calculated the radius of curvature of the lane and the position of the vehicle with respect to center.
+```bash
+$ python predict_api.py --device cpu # to run into cpu (by default is gpu)
+```
+Open the application in any browser 0.0.0.0:5000 and upload your image or video as is shown in video above.
 
-Offset from center of the lane is computed in `compute_offset_from_center()` as one of the step of the procecssing pipeline defined in [`main.py`](./main.py). The offset from the lane center can be computed under the hypothesis that the camera is fixed and mounted in the midpoint of the car roof. In this case, we can approximate the car's deviation from the lane center as the distance between the center of the image and the midpoint at the bottom of the image of the two lane-lines detected.  
 
-During the previous lane-line detection phase, a 2nd order polynomial is fitted to each lane-line using `np.polyfit()`. This function returns the 3 coefficients that describe the curve, namely the coefficients of both the 2nd and 1st order terms plus the bias. From this coefficients, following [this](http://www.intmath.com/applications-differentiation/8-radius-curvature.php) equation, we can compute the radius of curvature of the curve. From an implementation standpoint, I decided to move this methods as properties of `Line` class.
+## How to use the API
+
+### Interactive way
+Just open your favorite browser and go to 0.0.0.0:5000 and intuitevely load the image you want to label and press the buttom "Upload image".
+
+The API will return the image or video labeled.
+
+![Alt text](assets/zidane_bbox.png)
+
+All tasks are supported, for pose estimation, resutls should be as follow:
+![Zidane pose](assets/zidane_pose.png)
+
+
+### Call from terminal or python script
+The `client.py` code provides several example about how the API can be called. A very common way to do it is to call a public image from url and to get the coordinates of the bounding boxes:
+
+```python
+import requests
+
+resp = requests.get("http://0.0.0.0:5000/predict?source=https://raw.githubusercontent.com/ultralytics/ultralytics/main/ultralytics/assets/zidane.jpg&save_txt=T",
+                    verify=False)
+print(resp.content)
 
 ```
-class Line:
-  ... other stuff before ...
-    @property
-    # average of polynomial coefficients of the last N iterations
-    def average_fit(self):
-        return np.mean(self.recent_fits_pixel, axis=0)
+And you will get a json with the following data:
 
-    @property
-    # radius of curvature of the line (averaged)
-    def curvature(self):
-        y_eval = 0
-        coeffs = self.average_fit
-        return ((1 + (2 * coeffs[0] * y_eval + coeffs[1]) ** 2) ** 1.5) / np.absolute(2 * coeffs[0])
-
-    @property
-    # radius of curvature of the line (averaged)
-    def curvature_meter(self):
-        y_eval = 0
-        coeffs = np.mean(self.recent_fits_meter, axis=0)
-        return ((1 + (2 * coeffs[0] * y_eval + coeffs[1]) ** 2) ** 1.5) / np.absolute(2 * coeffs[0])
+```
+b'{"results": [{"name": "person", "class": 0, "confidence": 0.8892598748207092, "box": {"x1": 747.315673828125, "y1": 41.47210693359375, "x2": 1140.3927001953125, "y2": 712.91650390625}}, {"name": "person", "class": 0, "confidence": 0.8844665288925171, "box": {"x1": 144.88815307617188, "y1": 200.0352783203125, "x2": 1107.232177734375, "y2": 712.7000732421875}}, {"name": "tie", "class": 27, "confidence": 0.7176544070243835, "box": {"x1": 437.38336181640625, "y1": 434.477294921875, "x2": 529.9751586914062, "y2": 717.05126953125}}]}'
 ```
 
-#### 6. Provide an example image of your result plotted back down onto the road such that the lane area is identified clearly.
+In the case of pose estimation results are like this:
+```
+b'{"results": [{"name": "person", "class": 0, "confidence": 0.9490957260131836, "box": {"x1": 239.0, "y1": 15.0, "x2": 1018.0, "y2": 1053.0}, "keypoints": {"x": [604.9951782226562, 653.2091064453125, 552.5707397460938, 697.6889038085938, 457.49749755859375, 786.6876831054688, 358.194091796875, 954.072998046875, 488.3907775878906, 684.831298828125, 802.8469848632812, 687.2332153320312, 412.4287414550781, 924.52685546875, 632.3346557617188, 811.2559814453125, 768.5433349609375], "y": [316.5501403808594, 260.7156066894531, 257.27691650390625, 291.1667175292969, 285.6615905761719, 566.11962890625, 596.4549560546875, 909.6119384765625, 965.7925415039062, 997.584716796875, 841.6057739257812, 1066.0, 1066.0, 850.1934204101562, 812.7511596679688, 954.5965576171875, 951.3284912109375], "visible": [0.9959749579429626, 0.9608340859413147, 0.9934138655662537, 0.4281827211380005, 0.9349473118782043, 0.9848191738128662, 0.9723504185676575, 0.8565006852149963, 0.8561225533485413, 0.9004713296890259, 0.9377612471580505, 0.10934382677078247, 0.08168646693229675, 0.008380762301385403, 0.008864155039191246, 0.0017155600944533944, 0.001865472993813455]}}]}'
+```
 
-The whole processing pipeline, which starts from input frame and comprises undistortion, binarization, lane detection and de-warping back onto the original image, is implemented in function `process_pipeline()` in [`main.py`](./main.py).
 
-The qualitative result for one of the given test images follows:
+## TODO
+- [ ] Return txt values for videos
+- [ ] save folder according to task: detect, pose, segment, ...
+- [ ] Support any other model: SAM, RTDETR, NAS.
+- [ ] Docker files
+- [ ] Improve index template
 
-<p align="center">
-     <img src="./output_images/test2.jpg" alt="output_example" width="60%" height="60%">
-     <br>Qualitative result for test2.jpg
-</p>
 
-All other test images can be found in [./output_images/](./output_images/)
+## About me and contact
 
-###Pipeline (video)
+This code is based on the YOLOv8 code from Ultralytics and it has been modified by Henry Navarro
+ 
+If you want to know more about me, please visit my blog: [henrynavarro.org](https://henrynavarro.org).
 
-####1. Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (wobbly lines are ok but no catastrophic failures that would cause the car to drive off the road!).
+# 내가 하는거 메모
+울트라틱스 버전 8.0.223 ultralytics
+플라스크 3.0.0 flask
 
-Here's a [link to my video result](https://www.youtube.com/watch?v=g5BhDtoheE4).
+파이썬 3.10
 
----
+요구사항(여기까지가 목표) : 
+1. Flask 기반 분석 서버 구축 => 현재 해놓음.
+2.Client는 분석 서버로 이미지 / 영상을 송신 
+-json, post/get request 사용
 
-###Discussion
+---------------------------------------------------------------
 
-#### 1. Briefly discuss any problems / issues you faced in your implementation of this project.  Where will your pipeline likely fail?  What could you do to make it more robust?
-I find that the more delicate aspect of the pipeline is the first step, namely the binarization of the input frame. Indeed, if that step fails, most of successive steps will lead to poor results. The bad news is that this part is implemented by thresholding the input frame, so we let the correct value of a threshold be our single-point of failure. This is *bad*! Being currently 2017, I think a CNN could be employed to successfully make this step more robust. Some datasets like [Synthia](http://synthia-dataset.net/) should hopefully  provide enough lane marking annotation to train a deep network. I must try this later :-)
+우선 get으로 했을때 뭐가 오나 보자 => 영상이라서 post라도 큰 문제 없으니까(보안)
+
+- my_client.py 해석 다함. 
+- 서버인 predict_api 분석하기 => 현재 predict_api.py를 돌리면 기존의 업로드하는 창이 나오고(즉, 변화없음) / my_client.py를 하면 서버와의 연결중 오류가 발생함 
+ㄴ=> 서버쪽이 문제라고 파악됨.
 
 
